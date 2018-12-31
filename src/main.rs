@@ -1,25 +1,32 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::fs::OpenOptions;
 use std::io;
-use std::fs;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
+
+mod templates;
+use templates::ts_enum;
 
 struct TypeScriptImageUriEnum {
     enum_key: String,
     enum_value: String,
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
-    match args.get(1) {
-        None => panic!("Missing path"),
-        Some(folder) => {
-            let enum_result = make_typescript_enum(folder);
-            match enum_result {
-                Ok(ts_enum) => println!("{}", ts_enum),
-                Err(e) => println!("ERROR: {}", e),
-            }
+    let folder = args.get(1).expect("Missing path");
+    let enum_result = make_typescript_enum(folder);
+    let ts_enum = match enum_result {
+        Ok(ts_enum) => ts_enum,
+        Err(e) => {
+            println!("ERROR: {}", e);
+            String::from("")
         }
     };
+    let out_file = args.get(2).expect("Missing output file");
+    let mut ts_enum_file = OpenOptions::new().write(true).create(true).open(out_file)?;
+    ts_enum_file.write_all(ts_enum.as_bytes())?;
+    Ok(())
 }
 
 fn make_typescript_enum(folder: &String) -> Result<String, io::Error> {
@@ -31,7 +38,7 @@ fn make_typescript_enum(folder: &String) -> Result<String, io::Error> {
 
 fn map_file_stem_to_name(folder: &String) -> Result<Vec<TypeScriptImageUriEnum>, io::Error> {
     let paths = read_file_paths_in_folder(folder)?;
-    let mut filenames: Vec<TypeScriptImageUriEnum> = vec!();
+    let mut filenames: Vec<TypeScriptImageUriEnum> = vec![];
     for path in paths {
         if let (Some(file_name_os), Some(file_stem_os)) = (path.file_name(), path.file_stem()) {
             let filename = file_name_os.to_str();
@@ -50,7 +57,7 @@ fn map_file_stem_to_name(folder: &String) -> Result<Vec<TypeScriptImageUriEnum>,
 fn read_file_paths_in_folder(folder: &String) -> Result<Vec<PathBuf>, io::Error> {
     let folder_path = Path::new(folder);
     let dir_entries_iter = folder_path.read_dir()?;
-    let mut paths: Vec<PathBuf> = vec!();
+    let mut paths: Vec<PathBuf> = vec![];
     for entry_result in dir_entries_iter {
         let entry = entry_result?;
         let file_path_buf = entry.path();
@@ -60,16 +67,31 @@ fn read_file_paths_in_folder(folder: &String) -> Result<Vec<PathBuf>, io::Error>
 }
 
 fn create_typescript_image_uri_enum(file_steam_name: Vec<TypeScriptImageUriEnum>) -> String {
-    let mut typescript_files_uri = String::from("export const enum IconUri {\n");
+    let mut typescript_files_uri = format!(
+        "{} {}",
+        ts_enum::declaration(String::from("IconUri")),
+        ts_enum::opening_punctuation()
+    );
     println!("There are {} files", file_steam_name.len());
-    let pngs = file_steam_name.into_iter()
+    let pngs = file_steam_name
+        .into_iter()
         .filter(|file_s_and_n| file_s_and_n.enum_value.ends_with("png"))
         .collect::<Vec<TypeScriptImageUriEnum>>();
     println!("There are {} images", pngs.len());
+    let mut enum_content = String::from("");
     for steam_and_name in pngs {
-        let uri_map = format!("    {}: res://drawable/default/{},\n", steam_and_name.enum_key, steam_and_name.enum_value);
-        typescript_files_uri.push_str(uri_map.as_ref());
+        let uri_map = format!(
+            "    {} = \"res://drawable/default/{}\",\n",
+            format_enum_key(steam_and_name.enum_key),
+            steam_and_name.enum_value
+        );
+        enum_content.push_str(uri_map.as_ref());
     }
-    typescript_files_uri.push_str("}\n");
+    typescript_files_uri.push_str(enum_content.as_ref());
+    typescript_files_uri.push_str(ts_enum::closing_punctuation().as_ref());
     typescript_files_uri
+}
+
+fn format_enum_key(key: String) -> String {
+    key.replace("-", "_").replace(" ", "_")
 }
