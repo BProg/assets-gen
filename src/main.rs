@@ -1,4 +1,3 @@
-use std::env;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::prelude::*;
@@ -7,26 +6,39 @@ use std::path::{Path, PathBuf};
 mod templates;
 use templates::ts_enum;
 
+mod app;
+use app::GenAssetsApp;
+
 struct TypeScriptImageUriEnum {
     enum_key: String,
     enum_value: String,
 }
 
-fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let folder = args.get(1).expect("Missing path");
-    let enum_result = make_typescript_enum(folder);
-    let ts_enum = match enum_result {
-        Ok(ts_enum) => ts_enum,
+fn main() {
+    let mut app = GenAssetsApp::new();
+    app.set_on_input_output_parsed(|folder, out_file| {
+        let ts_enum = make_typescript_enum(&folder).map_err(|e| {
+            println!("input argument is wrong");
+            e
+        })?;
+        let mut ts_enum_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(out_file).map_err(|e| {
+                println!("output argument is wrong");
+                e
+            })?;
+        ts_enum_file.write_all(ts_enum.as_bytes()).map_err(|e| {
+            println!("cannot write to file {:?}", ts_enum_file);
+            e
+        })
+    });
+    match app.run() {
+        Ok(_) => {},
         Err(e) => {
-            println!("ERROR: {}", e);
-            String::from("")
-        }
-    };
-    let out_file = args.get(2).expect("Missing output file");
-    let mut ts_enum_file = OpenOptions::new().write(true).create(true).open(out_file)?;
-    ts_enum_file.write_all(ts_enum.as_bytes())?;
-    Ok(())
+            println!("{}", e);
+        },
+    }
 }
 
 fn make_typescript_enum(folder: &String) -> Result<String, io::Error> {
