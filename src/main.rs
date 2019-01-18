@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 mod templates;
 use templates::ts_enum;
 
-mod app;
-use app::GenAssetsApp;
+mod root_view;
+use root_view::RootView;
 
 struct TypeScriptImageUriEnum {
     enum_key: String,
@@ -15,7 +15,7 @@ struct TypeScriptImageUriEnum {
 }
 
 fn main() {
-    let mut app = GenAssetsApp::new();
+    let mut app = RootView::new();
     app.set_on_input_output_parsed(|folder, out_file| {
         let ts_enum = make_typescript_enum(&folder).map_err(|e| {
             println!("input argument is wrong");
