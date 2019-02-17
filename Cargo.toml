@@ -1,8 +1,9 @@
 [package]
 name = "genimg"
 version = "0.1.0"
-authors = ["Ion Ostafi <ion.ostafi@ellation.com>"]
+authors = ["Ion Ostafi <ostafi_ion@yahoo.com>"]
 
 [dependencies]
 clap = "2.26.0"
 console = "0.5.0"
+toml = "0.4"
